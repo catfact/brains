@@ -1,0 +1,104 @@
+#include "adc.h"
+#include "SPI.h"
+
+
+#include "mcp3903.h"
+
+const int AdcPins::CS_PINS[NUM_PARTS] = {
+  CS0,
+  CS1
+};
+
+static SPISettings spiSettings(AdcConfig::SPI_HZ,
+			       AdcConfig::SPI_ORDER,
+			       AdcConfig::SPI_MODE);
+
+void adc_init(void) {
+
+#ifdef MCP3903_EXT_CLK
+  // testing: use PWM for sampling clock
+  pinMode(AdcPins::MCLK, OUTPUT);
+  analogWriteFrequency(AdcPins::MCLK, AdcConfig::MCLK_HZ);
+  analogWrite(AdcPins::MCLK, 128);   // 50% duty cycle
+#endif
+  
+  pinMode(AdcPins::MOSI, OUTPUT);
+  pinMode(AdcPins::MISO, INPUT);
+  pinMode(AdcPins::CLK, OUTPUT);
+  pinMode(AdcPins::CS0, OUTPUT);
+  pinMode(AdcPins::CS1, OUTPUT);
+  
+  digitalWriteFast(AdcPins::CS0, HIGH);
+  digitalWriteFast(AdcPins::CS1, HIGH);
+  
+  SPI.begin();
+
+  //---- reset
+  uint32_t config = 0xfc0fd0;
+  SPI.beginTransaction(spiSettings);
+  MCP3903::writeRegister(0, MCP3903::REG_CONFIG, config);
+  SPI.endTransaction();
+
+  //---- config
+    // config register
+  config = 0x00000000;
+  // set dithering (bits 11-6)
+  config |= 0b111111000000;
+  // set oversampling ratio
+  config |= 0b110000;
+  // set EXTCLK
+  config |= 1;
+
+  SPI.beginTransaction(spiSettings);
+  MCP3903::writeRegister(0, MCP3903::REG_CONFIG, config);
+  SPI.endTransaction();
+
+  //---- status / comm
+  /// bits 20-15 are channel width
+  uint32_t status = 0b100111111100111111111111;
+  SPI.beginTransaction(spiSettings);
+  MCP3903::writeRegister(0, MCP3903::REG_STATUS_COMM, status);
+  SPI.endTransaction();
+
+  
+}
+
+void adc_read(int startChannel, int numChannels, uint32_t* data) {
+
+  
+  SPI.beginTransaction(spiSettings);
+  // test: one part, one channel
+  *data = MCP3903::readRegister(0, startChannel);
+  SPI.endTransaction();
+
+  // FIXME: use continuous read for multiple channels
+  
+  // // toggle chip select
+  // // TODO: since we have many chips, lookup and bang GPIO
+  // int csPin = AdcPins::CS0;
+  
+  // uint32_t val;
+  // uint8_t rx;
+  // uint8_t tx = 0;
+  
+  // digitalWrite(csPin, LOW);
+  // SPI.beginTransaction(spiSettings);
+
+  // // send first channel address (zero)
+  // tx = 0b01000001;
+  // SPI.transfer(tx);
+
+  // // subsequent transfers read consecutive channels
+  // for(int i=0; i<numChannels; i++) {
+  //   rx = SPI.transfer(tx);
+  //   val = ((uint32_t)rx) << 16;
+  //   rx = SPI.transfer(tx);
+  //   val |= ((uint32_t)rx) << 8;
+  //   rx = SPI.transfer(tx);
+  //   val |= ((uint32_t)rx);
+  //   *data++ = val;
+  // }
+  
+  // digitalWrite(csPin, HIGH);
+  // SPI.endTransaction();
+}
