@@ -2,12 +2,14 @@
 #include "usb_serial.h"
 #include "SPI.h"
 #include "adc.h"
+// use teensy lib, not arduino lib
 //#include "Serial.h"
 
 #include "serial_protocol.h"
 
 #define BTSERIAL Serial1
 
+// refresh rate in milliseconds
 static const int PERIOD_MS = 20;
 
 // raw data from ADC
@@ -15,12 +17,13 @@ static uint32_t adcData[NUM_CHANNELS];
 
 static void tx_adc(void);
 
+//--------------
+// test signal
 static uint32_t dacValue = 0;
 static uint32_t dacValue_inc = 32;
-
 static uint32_t dacValueMax;
-
 static uint32_t update_count = 0;
+//-------------
 
 bool useInternalAdc = false;
 
@@ -55,14 +58,16 @@ int main(void)
       adc_read(0, 1, &(adcData[0]));
     }
 
+	//------------
+	// test signal
     update_count++;
     if(update_count > 16) {
       update_count = 0;
-      // write test data to DAC
       dacValue += dacValue_inc;
       if(dacValue > dacValueMax) { dacValue = 0; }
       analogWriteDAC0( dacValue + 0x10);
     }
+	//-----------
     
     // write data to serial
     tx_adc();
